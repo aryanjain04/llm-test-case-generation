@@ -1,0 +1,53 @@
+{
+    "project_name": "KAN-Critic",
+    "description": "RL-based test generation with KAN value network",
+
+    "model": {
+        "base_model": "Salesforce/codet5-small",
+        "max_source_length": 512,
+        "max_target_length": 512
+    },
+
+    "training": {
+        "epochs": 5,
+        "batch_size": 4,
+        "learning_rate": 3e-4,
+        "gradient_accumulation_steps": 4,
+        "lora_rank": 16,
+        "lora_alpha": 32,
+        "eval_split": 0.1
+    },
+
+    "rl": {
+        "critic_type": "kan",
+        "clip_epsilon": 0.2,
+        "gamma": 0.99,
+        "gae_lambda": 0.95,
+        "learning_rate_actor": 1e-5,
+        "learning_rate_critic": 3e-4,
+        "num_episodes": 1000,
+        "batch_size": 4
+    },
+
+    "execution": {
+        "timeout": 30,
+        "reward_weights": {
+            "coverage": 0.4,
+            "pass_rate": 0.4,
+            "branch_coverage": 0.2
+        }
+    },
+
+    "kan": {
+        "hidden_dims": [8, 4],
+        "grid_size": 5,
+        "spline_order": 3
+    },
+
+    "paths": {
+        "dataset": "datasets/train.jsonl",
+        "checkpoints": "checkpoints/",
+        "results": "results/",
+        "repos_cache": "repos_cache/"
+    }
+}

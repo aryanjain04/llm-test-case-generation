@@ -26,3 +26,26 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Model checkpoints (large files)
+checkpoints/
+*.bin
+*.safetensors
+
+# Cloned repos for dataset mining
+repos_cache/
+
+# Results (regenerable)
+results/
+
+# Mutation testing
+.mutmut-cache/
+
+# Datasets (track the small ones, ignore large)
+datasets/*.large.jsonl
+
+# Eggs
+*.egg-info/
+dist/
+build/
+*.egg
