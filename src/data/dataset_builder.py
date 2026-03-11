@@ -105,7 +105,12 @@ class DatasetBuilder:
 
     def _find_source_module(self, test_file: Path, repo_root: Path) -> Optional[Path]:
         """
-        Heuristic: given test_foo.py, look for foo.py in likely locations.
+        Find the source module that a test file corresponds to.
+
+        Strategy:
+        1. Try direct name-based candidates (test_foo.py → foo.py)
+        2. Parse test file imports to find the source module
+        3. Recursive glob as last resort
         """
         test_name = test_file.stem  # e.g., "test_utils"
 
@@ -117,15 +122,11 @@ class DatasetBuilder:
         else:
             return None
 
-        # Search strategies (ordered by likelihood)
+        # Strategy 1: Direct path candidates (ordered by likelihood)
         candidates = [
-            # Same directory
             test_file.parent / f"{module_name}.py",
-            # Parent directory (tests/ → src/)
             test_file.parent.parent / f"{module_name}.py",
-            # src/ directory
             test_file.parent.parent / "src" / f"{module_name}.py",
-            # Parent's parent/src
             repo_root / "src" / f"{module_name}.py",
             repo_root / f"{module_name}.py",
         ]
@@ -133,6 +134,39 @@ class DatasetBuilder:
         for candidate in candidates:
             if candidate.exists():
                 return candidate
+
+        # Strategy 2: Recursive glob - find foo.py anywhere in the repo
+        matches = list(repo_root.rglob(f"{module_name}.py"))
+        # Filter out test files, __pycache__, .venv, etc.
+        matches = [
+            m for m in matches
+            if "test" not in m.name.lower()
+            and "__pycache__" not in str(m)
+            and ".venv" not in str(m)
+            and "venv" not in str(m)
+        ]
+        if matches:
+            return matches[0]
+
+        # Strategy 3: Parse imports from the test file to find source module
+        try:
+            test_source = test_file.read_text(encoding="utf-8", errors="ignore")
+            tree = ast.parse(test_source)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    # e.g., "from mypackage.utils import foo" → look for utils.py
+                    parts = node.module.split(".")
+                    for part in parts:
+                        part_matches = list(repo_root.rglob(f"{part}.py"))
+                        part_matches = [
+                            m for m in part_matches
+                            if "test" not in m.name.lower()
+                            and "__pycache__" not in str(m)
+                        ]
+                        if part_matches:
+                            return part_matches[0]
+        except Exception:
+            pass
 
         return None
 
@@ -199,19 +233,32 @@ class DatasetBuilder:
     def _find_matching_tests(
         self, func_name: str, test_tree: ast.Module, test_lines: list[str]
     ) -> list[str]:
-        """Find test functions that test a given source function."""
+        """
+        Find test functions that test a given source function.
+
+        Matching strategies:
+        1. Name-based: test_funcname() → funcname()
+        2. Call-based: any test function that calls funcname()
+        """
         matching = []
         func_name_lower = func_name.lower()
 
         for node in ast.walk(test_tree):
             if isinstance(node, ast.FunctionDef):
                 test_name_lower = node.name.lower()
-                # Match patterns: test_funcname, test_funcname_xxx
-                if (
+
+                # Strategy 1: Name-based matching
+                name_match = (
                     test_name_lower == f"test_{func_name_lower}"
                     or test_name_lower.startswith(f"test_{func_name_lower}_")
-                ):
-                    # Extract source of this test function
+                )
+
+                # Strategy 2: Call-based matching (test calls the source function)
+                call_match = False
+                if not name_match and node.name.startswith("test"):
+                    call_match = self._test_calls_function(node, func_name)
+
+                if name_match or call_match:
                     func_lines = test_lines[node.lineno - 1 : node.end_lineno]
                     matching.append("\n".join(func_lines))
 
@@ -223,6 +270,18 @@ class DatasetBuilder:
                     matching.append("\n".join(func_lines))
 
         return matching
+
+    def _test_calls_function(self, test_node: ast.FunctionDef, func_name: str) -> bool:
+        """Check if a test function body contains a call to the given function."""
+        for node in ast.walk(test_node):
+            if isinstance(node, ast.Call):
+                # Direct call: func_name(...)
+                if isinstance(node.func, ast.Name) and node.func.id == func_name:
+                    return True
+                # Attribute call: module.func_name(...)
+                if isinstance(node.func, ast.Attribute) and node.func.attr == func_name:
+                    return True
+        return False
 
     def save(self, filename: str = "train.jsonl"):
         """Save collected pairs to JSONL file."""
