@@ -21,7 +21,7 @@ which you can download from the Output tab.
 # Using LoRA (Parameter-Efficient Fine-Tuning) on T4 GPU
 
 # %% Cell 1: Install dependencies
-# !pip install peft accelerate jsonlines transformers sentencepiece --quiet
+# !pip install peft accelerate jsonlines 'transformers>=4.35.0,<5.0.0' sentencepiece --quiet
 
 # %% Cell 2: Imports and Setup
 import os
