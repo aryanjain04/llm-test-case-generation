@@ -169,7 +169,9 @@ class CodeT5Generator:
         print(f"Loading LoRA adapter: {checkpoint_path}")
         print(f"Device: {instance.device}")
 
-        instance.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+        # Load tokenizer from base model (checkpoint tokenizer.json may be
+        # incompatible across different tokenizers library versions)
+        instance.tokenizer = AutoTokenizer.from_pretrained(base_model)
 
         # Check if this is a PEFT/LoRA checkpoint
         adapter_config = Path(checkpoint_path) / "adapter_config.json"

@@ -26,7 +26,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--checkpoint",
-        default="checkpoints/codet5-base-finetuned/best",
+        default="checkpoints/codet5-finetuned/best",
         help="Path to Kaggle checkpoint (LoRA adapter or merged model)",
     )
     parser.add_argument(
