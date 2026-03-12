@@ -51,28 +51,28 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # %% Cell 3: Configuration
 # ============================================================
-# CONFIGURE THESE PATHS BASED ON YOUR KAGGLE DATASET LOCATION
+# AUTO-DETECT DATASET PATH — works regardless of dataset name
 # ============================================================
+import glob
 
-# If you uploaded as a Kaggle dataset named "llm-testgen-data":
-DATA_PATH = "/kaggle/input/llm-testgen-data/train_combined.jsonl"
+DATA_PATH = None
 
-# If the file is not found, try these alternatives:
-if not os.path.exists(DATA_PATH):
-    # Maybe uploaded directly
-    alternatives = [
-        "/kaggle/input/train_combined.jsonl",
-        "/kaggle/input/llm-testcase-data/train_combined.jsonl",
-        "/kaggle/input/testgen-dataset/train_combined.jsonl",
-        "train_combined.jsonl",  # uploaded to notebook
-    ]
-    for alt in alternatives:
+# Search for the file anywhere under /kaggle/input/
+candidates = glob.glob("/kaggle/input/**/train_combined.jsonl", recursive=True)
+if candidates:
+    DATA_PATH = candidates[0]
+else:
+    # Fallback: maybe uploaded to notebook working dir
+    for alt in ["train_combined.jsonl", "/kaggle/working/train_combined.jsonl"]:
         if os.path.exists(alt):
             DATA_PATH = alt
             break
 
 print(f"Data path: {DATA_PATH}")
-assert os.path.exists(DATA_PATH), f"Dataset not found! Upload train_combined.jsonl as a Kaggle dataset. Tried: {DATA_PATH}"
+assert DATA_PATH and os.path.exists(DATA_PATH), (
+    "Dataset not found! Make sure train_combined.jsonl is added as a Kaggle dataset input.\n"
+    "Go to: Add Input → Your Datasets → select the dataset containing train_combined.jsonl"
+)
 
 # Training config
 CONFIG = {
