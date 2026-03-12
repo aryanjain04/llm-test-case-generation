@@ -13,6 +13,12 @@ import json
 from pathlib import Path
 
 import torch
+
+# Fix peft compatibility with PyTorch 2.6 (DTensor moved to torch.distributed._tensor)
+if not hasattr(torch.distributed, "tensor"):
+    import torch.distributed._tensor
+    torch.distributed.tensor = torch.distributed._tensor
+
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
     AutoTokenizer,
@@ -119,7 +125,7 @@ def train(
     print(f"Device: {device}")
     if device == "cuda":
         print(f"GPU: {torch.cuda.get_device_name()}")
-        print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(model_name)

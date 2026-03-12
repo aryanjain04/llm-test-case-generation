@@ -18,7 +18,11 @@ from src.ast_analysis.feature_extractor import (
     extract_features_from_source,
     extract_functions_from_source,
 )
-from src.model.codet5_generator import CodeT5Generator, PROMPT_TEMPLATE_V1
+from src.model.codet5_generator import (
+    CodeT5Generator,
+    PROMPT_TEMPLATE_V1,
+    PROMPT_TEMPLATE_FINETUNE,
+)
 from src.execution.sandbox import TestExecutor
 from src.evaluation.metrics import Evaluator
 
@@ -51,9 +55,11 @@ def main():
     if args.checkpoint:
         print(f"Loading fine-tuned model from {args.checkpoint}")
         generator = CodeT5Generator.from_checkpoint(args.checkpoint)
+        prompt_template = PROMPT_TEMPLATE_FINETUNE  # Must match training prompt
     else:
         print("Using zero-shot CodeT5-small")
         generator = CodeT5Generator()
+        prompt_template = PROMPT_TEMPLATE_V1
 
     # 4. Generate tests
     print("\n=== Generating Tests ===")
@@ -65,7 +71,7 @@ def main():
 
         candidates = generator.generate(
             func_source,
-            prompt_template=PROMPT_TEMPLATE_V1,
+            prompt_template=prompt_template,
             num_return_sequences=args.num_candidates,
             temperature=args.temperature,
         )

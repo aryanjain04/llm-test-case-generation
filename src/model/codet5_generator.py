@@ -11,11 +11,18 @@ Upgrade path: codet5-base (220M) or codet5p-220m when resources allow.
 """
 
 import torch
+
+# Fix peft compatibility with PyTorch 2.6 (DTensor moved to torch.distributed._tensor)
+if not hasattr(torch.distributed, "tensor"):
+    import torch.distributed._tensor
+    torch.distributed.tensor = torch.distributed._tensor
+
 from transformers import (
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
     T5ForConditionalGeneration,
 )
+from peft import PeftModel
 from typing import Optional
 from pathlib import Path
 
@@ -45,6 +52,10 @@ PROMPT_TEMPLATE_MINIMAL = """# Function:
 
 # Unit test:
 def test_"""
+
+# This matches the exact prompt used during fine-tuning
+PROMPT_TEMPLATE_FINETUNE = """Generate pytest tests for:
+{function_code}"""
 
 
 class CodeT5Generator:
@@ -138,9 +149,43 @@ class CodeT5Generator:
         return results
 
     @classmethod
-    def from_checkpoint(cls, checkpoint_path: str, **kwargs) -> "CodeT5Generator":
-        """Load from a fine-tuned checkpoint directory."""
-        return cls(model_name_or_path=checkpoint_path, **kwargs)
+    def from_checkpoint(
+        cls,
+        checkpoint_path: str,
+        base_model: str = DEFAULT_MODEL,
+        **kwargs,
+    ) -> "CodeT5Generator":
+        """Load from a fine-tuned checkpoint directory (supports LoRA adapters).
+        
+        Args:
+            checkpoint_path: Path to the LoRA adapter checkpoint
+            base_model: Base model name to load adapters onto
+        """
+        instance = cls.__new__(cls)
+        instance.device = kwargs.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
+        instance.max_length = kwargs.get("max_length", 512)
+
+        print(f"Loading base model: {base_model}")
+        print(f"Loading LoRA adapter: {checkpoint_path}")
+        print(f"Device: {instance.device}")
+
+        instance.tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+
+        # Check if this is a PEFT/LoRA checkpoint
+        adapter_config = Path(checkpoint_path) / "adapter_config.json"
+        if adapter_config.exists():
+            base = AutoModelForSeq2SeqLM.from_pretrained(base_model)
+            instance.model = PeftModel.from_pretrained(base, checkpoint_path)
+            instance.model = instance.model.merge_and_unload()  # Merge for faster inference
+            print("LoRA adapter merged into base model")
+        else:
+            instance.model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_path)
+
+        instance.model.to(instance.device)
+        instance.model.eval()
+
+        print(f"Model loaded. Parameters: {sum(p.numel() for p in instance.model.parameters()):,}")
+        return instance
 
 
 def run_baseline_demo(functions_file: str):
