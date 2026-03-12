@@ -131,7 +131,7 @@ class TestExecutor:
             func_file.write_text(function_source, encoding="utf-8")
 
             # Fix imports in test source - replace absolute imports with local
-            fixed_test = self._fix_imports(test_source, function_name)
+            fixed_test = self._fix_imports(test_source, function_name, function_source)
 
             # Check if test code is syntactically valid
             compilable = self._check_syntax(fixed_test)
@@ -151,8 +151,12 @@ class TestExecutor:
             # Run with coverage
             return self._run_with_coverage(tmpdir, func_file, test_file, function_name)
 
-    def _fix_imports(self, test_source: str, module_name: str) -> str:
-        """Adjust imports so tests can find the function module in tmpdir."""
+    def _fix_imports(self, test_source: str, module_name: str, function_source: str = "") -> str:
+        """Adjust imports so tests can find the function module in tmpdir.
+        
+        If no import statement is found in the test source, auto-injects
+        a wildcard import from the function module.
+        """
         # Replace common import patterns
         import_patterns = [
             (f"from functions import", f"from {module_name} import"),
@@ -161,6 +165,32 @@ class TestExecutor:
         result = test_source
         for old, new in import_patterns:
             result = result.replace(old, new)
+
+        # Check if there's any import of the module already
+        has_import = (
+            f"from {module_name} import" in result
+            or f"import {module_name}" in result
+        )
+
+        if not has_import:
+            # Extract function names from source to build explicit imports
+            import ast
+            try:
+                tree = ast.parse(function_source)
+                func_names = [
+                    node.name for node in ast.walk(tree)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                ]
+                if func_names:
+                    import_line = f"from {module_name} import {', '.join(func_names)}\n"
+                else:
+                    import_line = f"from {module_name} import *\n"
+            except SyntaxError:
+                import_line = f"from {module_name} import *\n"
+
+            # Prepend import (after any existing imports/comments at top)
+            result = import_line + result
+
         return result
 
     def _check_syntax(self, code: str) -> bool:

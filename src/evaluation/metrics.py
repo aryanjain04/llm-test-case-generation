@@ -136,6 +136,7 @@ class Evaluator:
 
             per_func = {
                 "function_name": func_name,
+                "generated_test": test_source,
                 "compilable": exec_result.compilable,
                 "passed": exec_result.passed,
                 "failed": exec_result.failed,

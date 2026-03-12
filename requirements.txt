@@ -1,6 +1,6 @@
 # === Core ML ===
 torch>=2.0.0
-transformers>=4.35.0
+transformers>=4.35.0,<5.0.0
 datasets>=2.14.0
 accelerate>=0.24.0
 peft>=0.7.0            # LoRA for parameter-efficient fine-tuning (fits 4-6GB VRAM)
