@@ -105,6 +105,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/rl_mlp.json")
     parser.add_argument("--critic-type", choices=["mlp", "kan"], default=None)
+    parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--num-episodes", type=int, default=None)
     parser.add_argument("--max-functions", type=int, default=None)
     parser.add_argument("--device", default=None)
@@ -112,7 +113,7 @@ def main():
 
     cfg = load_config(args.config)
 
-    seed = int(cfg.get("seed", 42))
+    seed = int(args.seed if args.seed is not None else cfg.get("seed", 42))
     set_seed(seed)
 
     device = args.device or cfg.get("device", "cuda")
