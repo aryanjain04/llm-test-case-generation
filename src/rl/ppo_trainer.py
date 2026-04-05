@@ -25,7 +25,7 @@ from torch.distributions import Categorical
 from typing import Optional
 from dataclasses import dataclass
 
-from src.rl.critic import CriticFactory, MLPCritic
+from src.rl.critic import CriticFactory
 from src.execution.sandbox import TestExecutor
 from src.ast_analysis.feature_extractor import (
     extract_features_from_source,
@@ -113,6 +113,7 @@ class PPOTrainer:
         # Training stats
         self.episode_rewards: list[float] = []
         self.episode_coverages: list[float] = []
+        self.training_history: list[dict] = []
 
     def collect_experience(self, function_code: str) -> Experience:
         """
@@ -281,7 +282,7 @@ class PPOTrainer:
         self.experiences = []
         return stats
 
-    def train(self, functions: list[str]):
+    def train(self, functions: list[str]) -> list[dict]:
         """
         Main training loop.
 
@@ -310,6 +311,15 @@ class PPOTrainer:
                 if episode % self.config.log_interval == 0:
                     avg_reward = sum(self.episode_rewards[-self.config.log_interval:]) / self.config.log_interval
                     avg_cov = sum(self.episode_coverages[-self.config.log_interval:]) / self.config.log_interval
+                    history_row = {
+                        "episode": episode,
+                        "avg_reward": avg_reward,
+                        "avg_line_coverage": avg_cov,
+                        "critic_loss": stats.get("critic_loss", 0.0),
+                        "actor_loss": stats.get("actor_loss", 0.0),
+                        "buffer_size": stats.get("buffer_size", 0),
+                    }
+                    self.training_history.append(history_row)
                     print(
                         f"Episode {episode}/{self.config.num_episodes} | "
                         f"Reward: {avg_reward:.3f} | "
@@ -318,7 +328,4 @@ class PPOTrainer:
                     )
 
         print("\nTraining complete!")
-        return {
-            "total_episodes": self.config.num_episodes,
-            "final_avg_reward": sum(self.episode_rewards[-50:]) / min(50, len(self.episode_rewards)),
-        }
+        return self.training_history

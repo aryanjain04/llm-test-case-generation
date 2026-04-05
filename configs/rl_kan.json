@@ -1,0 +1,38 @@
+{
+  "experiment": "ppo_kan_v1",
+  "seed": 42,
+  "device": "cuda",
+  "actor": {
+    "base_model": "Salesforce/codet5-base",
+    "adapter_checkpoint": "checkpoints/codet5-finetuned/best"
+  },
+  "data": {
+    "train_jsonl": "datasets/train_combined.jsonl",
+    "max_functions": 1000
+  },
+  "ppo": {
+    "clip_epsilon": 0.2,
+    "value_loss_coef": 0.5,
+    "entropy_coef": 0.01,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "max_grad_norm": 0.5,
+    "ppo_epochs": 4,
+    "batch_size": 4,
+    "learning_rate_actor": 1e-5,
+    "learning_rate_critic": 3e-4,
+    "critic_type": "kan",
+    "num_episodes": 500,
+    "log_interval": 20
+  },
+  "output": {
+    "dir": "checkpoints/ppo_kan_v1",
+    "train_log": "results/ppo_kan_v1_train_log.json",
+    "config_dump": "results/ppo_kan_v1_config.json"
+  },
+  "kan": {
+    "hidden_dims": [8, 4],
+    "grid_size": 5,
+    "spline_order": 3
+  }
+}
