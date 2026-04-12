@@ -95,10 +95,17 @@ class PPOTrainer:
         self.tokenizer = actor_tokenizer
 
         # Critic
-        self.critic = CriticFactory.create(
-            critic_type=config.critic_type,
-            input_dim=CodeFeatures.num_features(),
-        ).to(self.critic_device)
+        if config.critic_type == "kan":
+            self.critic = CriticFactory.create(
+                critic_type=config.critic_type,
+                input_dim=CodeFeatures.num_features(),
+                device=self.critic_device,
+            ).to(self.critic_device)
+        else:
+            self.critic = CriticFactory.create(
+                critic_type=config.critic_type,
+                input_dim=CodeFeatures.num_features(),
+            ).to(self.critic_device)
 
         # KAN critic is lazily initialized; trigger one forward pass so
         # parameters exist before constructing the optimizer.
