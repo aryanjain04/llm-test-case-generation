@@ -85,6 +85,10 @@ class PPOTrainer:
     ):
         self.config = config
         self.device = device
+        self.actor_device = device
+        # pykan often mixes internal tensors on CPU/CUDA. Keep KAN critic on CPU
+        # for stability while actor remains on GPU.
+        self.critic_device = "cpu" if config.critic_type == "kan" else device
 
         # Actor (CodeT5 — already fine-tuned)
         self.actor = actor_model
@@ -94,14 +98,14 @@ class PPOTrainer:
         self.critic = CriticFactory.create(
             critic_type=config.critic_type,
             input_dim=CodeFeatures.num_features(),
-        ).to(device)
+        ).to(self.critic_device)
 
         # KAN critic is lazily initialized; trigger one forward pass so
         # parameters exist before constructing the optimizer.
         critic_params = list(self.critic.parameters())
         if len(critic_params) == 0:
             dummy_features = torch.zeros(
-                (1, CodeFeatures.num_features()), dtype=torch.float32, device=device
+                (1, CodeFeatures.num_features()), dtype=torch.float32, device=self.critic_device
             )
             _ = self.critic(dummy_features)
             critic_params = list(self.critic.parameters())
@@ -151,7 +155,7 @@ class PPOTrainer:
         prompt = f"Generate pytest tests for:\n{function_code}"
         inputs = self.tokenizer(
             prompt, return_tensors="pt", max_length=512, truncation=True
-        ).to(self.device)
+        ).to(self.actor_device)
 
         with torch.no_grad():
             outputs = self.actor.generate(
@@ -176,7 +180,7 @@ class PPOTrainer:
 
         # 4. Critic estimates value
         feature_tensor = torch.tensor(
-            [feature_vec], dtype=torch.float32, device=self.device
+            [feature_vec], dtype=torch.float32, device=self.critic_device
         )
         with torch.no_grad():
             value = self.critic(feature_tensor).item()
@@ -229,8 +233,8 @@ class PPOTrainer:
             advantages.insert(0, gae)
             returns.insert(0, gae + values[t])
 
-        advantages = torch.tensor(advantages, dtype=torch.float32, device=self.device)
-        returns = torch.tensor(returns, dtype=torch.float32, device=self.device)
+        advantages = torch.tensor(advantages, dtype=torch.float32, device=self.critic_device)
+        returns = torch.tensor(returns, dtype=torch.float32, device=self.critic_device)
 
         # Normalize advantages
         if len(advantages) > 1:
@@ -253,12 +257,12 @@ class PPOTrainer:
         features = torch.tensor(
             [e.function_features for e in self.experiences],
             dtype=torch.float32,
-            device=self.device,
+            device=self.critic_device,
         )
         old_log_probs = torch.tensor(
             [e.log_prob for e in self.experiences],
             dtype=torch.float32,
-            device=self.device,
+            device=self.critic_device,
         )
 
         total_actor_loss = 0.0
