@@ -96,12 +96,27 @@ class PPOTrainer:
             input_dim=CodeFeatures.num_features(),
         ).to(device)
 
+        # KAN critic is lazily initialized; trigger one forward pass so
+        # parameters exist before constructing the optimizer.
+        critic_params = list(self.critic.parameters())
+        if len(critic_params) == 0:
+            dummy_features = torch.zeros(
+                (1, CodeFeatures.num_features()), dtype=torch.float32, device=device
+            )
+            _ = self.critic(dummy_features)
+            critic_params = list(self.critic.parameters())
+            if len(critic_params) == 0:
+                raise RuntimeError(
+                    "Critic has no parameters after initialization. "
+                    "Check KAN/pykan installation."
+                )
+
         # Optimizers
         self.actor_optimizer = torch.optim.AdamW(
             self.actor.parameters(), lr=config.learning_rate_actor
         )
         self.critic_optimizer = torch.optim.AdamW(
-            self.critic.parameters(), lr=config.learning_rate_critic
+            critic_params, lr=config.learning_rate_critic
         )
 
         # Test executor
